@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SSIM KPI Dashboard — SIC & SFT MENA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<style>
+:root{
+  --blue:#1428A0; --navy:#0B1240; --tint:#EEF1FB; --tint2:#E2E8FA;
+  --bg:#F6F7FB; --paper:#FFFFFF; --ink:#1A1C23; --mut:#5C6270; --line:#E4E6EC;
+  --ok:#0E8A5F; --ok-bg:#E7F4EE; --warn:#B96E00; --warn-bg:#FBF1E0;
+  --risk:#C8362B; --risk-bg:#FBEAE8; --idle:#9AA0AC; --idle-bg:#F0F1F4;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion: reduce){html{scroll-behavior:auto}*{transition:none!important}}
+body{font-family:'Schibsted Grotesk',system-ui,sans-serif;background:var(--bg);color:var(--ink);font-size:14.5px;line-height:1.5}
+a{color:var(--blue)}
+button{font-family:inherit}
+
+/* ---------- app bar ---------- */
+.appbar{background:var(--navy);color:#fff;position:sticky;top:0;z-index:50}
+.appbar-inner{max-width:1180px;margin:0 auto;padding:0 24px;display:flex;align-items:center;gap:28px;height:58px}
+.wordmark{font-weight:800;font-size:16px;letter-spacing:-.01em;white-space:nowrap}
+.wordmark span{color:#8FA3F0;font-weight:500}
+.tabs{display:flex;gap:4px;flex:1}
+.tab{background:none;border:none;color:#B9C2E8;font-size:14px;font-weight:500;padding:8px 14px;border-radius:6px;cursor:pointer}
+.tab:hover{color:#fff;background:rgba(255,255,255,.08)}
+.tab.active{color:#fff;background:var(--blue)}
+.tab:focus-visible,.cycle-sel:focus-visible,.rowlink:focus-visible{outline:2px solid #8FA3F0;outline-offset:2px}
+.cycle-sel{background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:6px;padding:6px 10px;font-size:13px;font-weight:500}
+.cycle-sel option{color:var(--ink)}
+
+/* ---------- layout ---------- */
+.wrap{max-width:1180px;margin:0 auto;padding:28px 24px 60px}
+.page-head{margin-bottom:22px}
+.page-head h1{font-size:26px;font-weight:800;letter-spacing:-.02em}
+.page-head p{color:var(--mut);margin-top:4px;max-width:76ch}
+.datasource{font-size:12.5px;color:var(--mut);margin-top:10px;display:flex;align-items:center;gap:8px}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.dot.live{background:var(--ok)} .dot.sample{background:var(--warn)}
+
+/* ---------- overview ---------- */
+.statline{display:flex;gap:40px;flex-wrap:wrap;padding:18px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);margin-bottom:26px}
+.stat .v{font-size:30px;font-weight:800;letter-spacing:-.02em;line-height:1.1}
+.stat .l{font-size:13px;color:var(--mut);margin-top:2px}
+.panel{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:22px;margin-bottom:22px}
+.panel h2{font-size:16px;font-weight:700;margin-bottom:4px}
+.panel .sub{font-size:13px;color:var(--mut);margin-bottom:16px}
+.chartbox{position:relative;width:100%}
+
+.heat{width:100%;border-collapse:collapse;font-size:13.5px}
+.heat th{text-align:left;font-weight:600;color:var(--mut);padding:8px 10px;border-bottom:1px solid var(--line);font-size:12.5px}
+.heat th.num,.heat td.num{text-align:right}
+.heat td{padding:9px 10px;border-bottom:1px solid var(--line)}
+.heat tr:last-child td{border-bottom:none}
+.rowlink{background:none;border:none;font:inherit;font-weight:700;color:var(--blue);cursor:pointer;padding:0;text-align:left}
+.rowlink:hover{text-decoration:underline}
+.cellpct{display:inline-block;min-width:52px;text-align:right;font-variant-numeric:tabular-nums;font-weight:600;padding:3px 8px;border-radius:5px}
+.c-ok{background:var(--ok-bg);color:var(--ok)} .c-warn{background:var(--warn-bg);color:var(--warn)}
+.c-risk{background:var(--risk-bg);color:var(--risk)} .c-idle{background:var(--idle-bg);color:var(--idle)}
+.tierchip{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:6px;font-weight:800;font-size:13px;color:#fff}
+.t-A{background:var(--ok)} .t-B{background:var(--blue)} .t-C{background:var(--warn)} .t-D{background:var(--risk)}
+
+/* ---------- subsidiary detail ---------- */
+.backlink{background:none;border:none;color:var(--mut);font-size:13.5px;cursor:pointer;margin-bottom:14px;padding:0}
+.backlink:hover{color:var(--blue)}
+.sumband{display:grid;grid-template-columns:minmax(240px,1fr) minmax(280px,420px);gap:28px;align-items:center;background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:26px;margin-bottom:24px}
+.bigscore{font-size:64px;font-weight:800;letter-spacing:-.03em;line-height:1}
+.bigscore small{font-size:24px;color:var(--mut);font-weight:500}
+.scoremeta{margin-top:10px;color:var(--mut);font-size:13.5px}
+.gaphint{margin-top:14px;font-size:13.5px;background:var(--tint);color:var(--navy);border-radius:7px;padding:9px 12px;display:inline-block}
+.radarbox{position:relative;height:260px}
+
+.pillarsec{margin-bottom:26px}
+.pillarsec>h2{font-size:17px;font-weight:800;letter-spacing:-.01em;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.pillarsec>h2 .pw{font-size:13px;color:var(--mut);font-weight:500}
+.pillarsec>.pdesc{font-size:13px;color:var(--mut);margin:2px 0 12px}
+.kpilist{background:var(--paper);border:1px solid var(--line);border-radius:10px}
+.kpirow{display:grid;grid-template-columns:minmax(230px,1.25fr) minmax(220px,2fr) 125px;gap:18px;align-items:center;padding:14px 18px;border-bottom:1px solid var(--line)}
+.kpirow:last-child{border-bottom:none}
+.kpiname{font-weight:600;font-size:14px}
+.kpiq{font-size:11px;color:var(--mut);font-weight:500;background:var(--idle-bg);border-radius:4px;padding:1px 6px;margin-left:6px;white-space:nowrap}
+.kpitarget{font-size:12.5px;color:var(--mut);margin-top:2px}
+.kpicomment{font-size:12.5px;color:var(--mut);margin-top:4px;font-style:italic}
+.bullet{position:relative;height:18px;background:var(--idle-bg);border-radius:4px;overflow:visible}
+.bullet .fill{position:absolute;left:0;top:0;bottom:0;border-radius:4px;min-width:2px}
+.bullet .tick{position:absolute;right:0;top:-4px;bottom:-4px;width:2.5px;background:var(--navy);border-radius:2px}
+.bullet .ticklbl{position:absolute;right:-2px;top:-20px;font-size:10.5px;color:var(--mut);white-space:nowrap}
+.f-ok{background:var(--ok)} .f-warn{background:var(--warn)} .f-risk{background:var(--risk)} .f-idle{background:var(--idle)}
+.kpistat{text-align:right}
+.kpistat .pct{font-size:18px;font-weight:800;font-variant-numeric:tabular-nums}
+.kpistat .vt{font-size:12px;color:var(--mut);font-variant-numeric:tabular-nums}
+.statuschip{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;margin-top:3px}
+
+/* ---------- KPI guide ---------- */
+.guide{width:100%;border-collapse:collapse;font-size:13.5px;background:var(--paper)}
+.guide th{text-align:left;padding:10px 12px;border-bottom:2px solid var(--line);font-size:12.5px;color:var(--mut)}
+.guide td{padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+code.k{background:var(--tint);color:var(--navy);padding:1px 6px;border-radius:4px;font-size:12px;font-family:ui-monospace,monospace}
+
+.note{font-size:13px;color:var(--mut);background:var(--paper);border:1px dashed var(--line);border-radius:8px;padding:12px 14px;margin-top:8px}
+.empty{color:var(--mut);padding:30px;text-align:center}
+
+@media(max-width:860px){
+  .appbar-inner{gap:12px;padding:0 14px;overflow-x:auto}
+  .wrap{padding:20px 14px 50px}
+  .sumband{grid-template-columns:1fr}
+  .kpirow{grid-template-columns:1fr;gap:8px}
+  .kpistat{text-align:left}
+  .statline{gap:22px}
+}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+'use strict';
+/* =============================================================================
+   SSIM KPI DASHBOARD — SIC & SFT MENA
+   -----------------------------------------------------------------------------
+   DATA SOURCE: a plain data.csv file kept in the SAME GitHub repository as
+   this page. Subsidiaries edit data.csv on github.com (pencil icon > commit);
+   GitHub Pages redeploys automatically and the dashboard updates itself.
+
+   data.csv columns (one header row):
+     subsidiary,cycle,kpi,value,target,comment,updated
+   - subsidiary : SGE, SETK SFT, SETK SIC, SELV, SESAR, SEPAK, SEIL, Iran,
+                  Morocco, Algeria, Tunisia, SEEG
+   - cycle      : the year (2025, 2026, 2027 ...). NEW YEARS NEED NO CODE
+                  CHANGE — add rows with the new year and it appears in the
+                  year selector automatically; previous years stay intact.
+   - kpi        : KPI code from the KPI guide page (ST-01 ... ME-07)
+   - value      : the actual number (1/0 for yes-no KPIs). May be left blank
+                  on a row that only sets a target.
+   - target     : OPTIONAL subsidiary-specific target for that year
+                  (e.g. SEEG PRL target 8, SETK 9, default 5).
+                  A target of 0 marks the KPI "Not applicable" for that sub
+                  (e.g. employee volunteering in Iran) and removes it from
+                  the score.
+   - If the same KPI appears twice, the LAST row wins, so corrections can
+     simply be appended at the bottom.
+   DATA_URL can also be any absolute CSV link (e.g. a SharePoint/intranet CSV)
+   if GitHub is not reachable from the corporate network.
+============================================================================= */
+const CONFIG = {
+  DATA_URL: "data.csv",
+  TITLE: "SIC & SFT — MENA",
+};
+
+/* --------------------------- SSIM definitions ----------------------------- */
+const PILLARS = [
+  {id:'ST',name:'Storytelling',weight:60,desc:'Communication with participants, external PR, internal comms and stakeholder feedback — the heaviest pillar in SSIM.'},
+  {id:'SU',name:'Sustainable',weight:20,desc:'Government cooperation, NGO partnership, ethical guidelines and alumni continuity.'},
+  {id:'IM',name:'Impactful',weight:10,desc:'Satisfaction, pre/post measurement and educational outcomes — measured through the CCO KPI files.'},
+  {id:'ME',name:'Meaningful',weight:10,desc:'Local relevance, leadership and employee involvement, teachers, awards and external recognition.'},
+];
+/* kind: 'num' = count against target · 'bool' = yes(1)/no(0) */
+const KPIS = [
+  // ---- STORYTELLING (60%) ----
+  {code:'ST-01',pillar:'ST',q:'Q1', name:'Two-way communication channel',kind:'bool',target:1,unit:'yes/no',desc:'Operate a two-way channel with participants all year (WhatsApp / Facebook community). Evidence: screenshots.'},
+  {code:'ST-02',pillar:'ST',q:'Q2', name:'Alumni tracking after the program',kind:'bool',target:1,unit:'yes/no',desc:'Activities to check alumni status (survey, network, regular contact). Evidence: tracking sheet or comms.'},
+  {code:'ST-03',pillar:'ST',q:'Q3', name:'Posts on official social media',kind:'num',target:50,unit:'posts',desc:'Content related to the program posted on the sub\u2019s official SNS. Full score at 50+ posts with links and channel names.'},
+  {code:'ST-04',pillar:'ST',q:'Q3', name:'Official SNS channels used',kind:'num',target:2,unit:'channels',desc:'Use two or more of the sub\u2019s official channels (YouTube / Instagram / TikTok / Facebook).'},
+  {code:'ST-05',pillar:'ST',q:'Q3', name:'Samsung Newsroom posts',kind:'num',target:2,unit:'posts',desc:'Program content posted on the subsidiary\u2019s Samsung Newsroom channel, two times or more.'},
+  {code:'ST-06',pillar:'ST',q:'Q4', name:'External press coverage',kind:'num',target:4,unit:'articles',desc:'Program covered four times or more by external press media. Keep the list of links.'},
+  {code:'ST-07',pillar:'ST',q:'Q4', name:'Event with external stakeholders',kind:'num',target:1,unit:'events',desc:'At least one event inviting external stakeholders (press event, ceremony with media).'},
+  {code:'ST-08',pillar:'ST',q:'Q5', name:'Knox Portal posts',kind:'num',target:1,unit:'posts',desc:'One or more posts on Knox Portal (Now news or contents posting).'},
+  {code:'ST-09',pillar:'ST',q:'Q5', name:'Emails to employees',kind:'num',target:1,unit:'emails',desc:'One or more program emails sent to the subsidiary\u2019s employees (mentor call, results).'},
+  {code:'ST-10',pillar:'ST',q:'Q5', name:'Internal employee events',kind:'num',target:1,unit:'events',desc:'One or more events targeting the sub\u2019s employees (town hall, training session, volunteering call).'},
+  {code:'ST-11',pillar:'ST',q:'Q6', name:'PR plan before program start',kind:'bool',target:1,unit:'yes/no',desc:'A written, detailed PR plan exists BEFORE the program starts. Evidence: the plan document.'},
+  {code:'ST-12',pillar:'ST',q:'Q7', name:'PR results improved vs last year',kind:'bool',target:1,unit:'yes/no',desc:'Measured PR results (reach, engagement, buzz, posts) improved compared to last year.'},
+  {code:'ST-13',pillar:'ST',q:'Q8', name:'Stakeholder groups with feedback',kind:'num',target:5,unit:'groups',desc:'Collect raw feedback (name, title, quote) from all 5 groups: students, teachers/parents, government, NGOs/partners, employees.'},
+  {code:'ST-14',pillar:'ST',q:'PRL',name:'PRLs published',kind:'num',target:5,unit:'PRLs',desc:'Press releases issued across the year. CCO-recommended cadence: launch, partnership (+1 month), mid-program milestone, graduation, impact/alumni story. Per-sub target set by CCO (SETK 9, SEEG 8, default 5).'},
+  // ---- SUSTAINABLE (20%) ----
+  {code:'SU-01',pillar:'SU',q:'Q11',name:'Official government agreement',kind:'bool',target:1,unit:'yes/no',desc:'Signed agreement (MOU) with key ministries, local government or affiliated organizations. Evidence: MOU document.'},
+  {code:'SU-02',pillar:'SU',q:'Q12',name:'NGO partner performance documented',kind:'bool',target:1,unit:'yes/no',desc:'Main NGO named with evidenced strong contribution to the program.'},
+  {code:'SU-03',pillar:'SU',q:'Q13',name:'Partner key-figure categories involved',kind:'num',target:4,unit:'categories',desc:'Key figures participating in events from: government officials, public organizations, NGO/partner members, school/education members. Evidence: photos, emails, who/role/when.'},
+  {code:'SU-04',pillar:'SU',q:'Q14',name:'Ethical guideline established',kind:'bool',target:1,unit:'yes/no',desc:'A local guideline protecting beneficiaries\u2019 rights and interests exists.'},
+  {code:'SU-05',pillar:'SU',q:'Q15',name:'Ethical guideline implemented',kind:'bool',target:1,unit:'yes/no',desc:'Guideline actively used: ethics education/briefing provided to participants.'},
+  {code:'SU-06',pillar:'SU',q:'Q18',name:'Alumni continuity actions',kind:'num',target:3,unit:'actions',desc:'Full score needs all three: past participants take part in this year\u2019s program, alumni stories used as PR content, and an alumni network / management system.'},
+  {code:'SU-07',pillar:'SU',q:'Q19',name:'Operational improvements',kind:'bool',target:1,unit:'yes/no',desc:'Documented improvements to operational capabilities vs last year (tools, processes, on-time CCO reporting).'},
+  // ---- IMPACTFUL (10%) ----
+  {code:'IM-01',pillar:'IM',q:'Q20',name:'Satisfaction survey conducted',kind:'bool',target:1,unit:'yes/no',desc:'Participant satisfaction survey conducted and recorded in the CCO KPI sheet.'},
+  {code:'IM-02',pillar:'IM',q:'Q21',name:'Satisfaction improved vs last year',kind:'bool',target:1,unit:'yes/no',desc:'Satisfaction level higher than last year, per the KPI sheet.'},
+  {code:'IM-03',pillar:'IM',q:'Q22',name:'Pre/post measures tracked',kind:'num',target:3,unit:'measures',desc:'Measured through CCO KPI files: capability evaluation, course completion rate, employment rate.'},
+  {code:'IM-04',pillar:'IM',q:'Q23',name:'Education hours per trainee',kind:'num',target:100,unit:'hours',desc:'100 or more hours of structured education provided to trainees.'},
+  {code:'IM-05',pillar:'IM',q:'Q23',name:'Hackathon / capstone contest',kind:'bool',target:1,unit:'yes/no',desc:'At least one internal contest (hackathon or capstone) conducted.'},
+  {code:'IM-06',pillar:'IM',q:'Q23',name:'Employee / expert mentoring',kind:'bool',target:1,unit:'yes/no',desc:'Employee or expert mentoring provided to participants.'},
+  {code:'IM-07',pillar:'IM',q:'Q23',name:'Employment-support education',kind:'bool',target:1,unit:'yes/no',desc:'Additional education for employment support (CV workshops, interview prep, career guidance).'},
+  {code:'IM-08',pillar:'IM',q:'Q24',name:'Educational outcomes improved',kind:'bool',target:1,unit:'yes/no',desc:'Key educational outcomes improved vs last year (capability / completion / employment).'},
+  // ---- MEANINGFUL (10%) ----
+  {code:'ME-01',pillar:'ME',q:'Q26',name:'Local needs reflected in design',kind:'bool',target:1,unit:'yes/no',desc:'Program design based on needs of key local stakeholders and beneficiaries.'},
+  {code:'ME-02',pillar:'ME',q:'Q28',name:'Top management participation types',kind:'num',target:5,unit:'types',desc:'Full score: all five — jury, speaker, award presenter, video message, written message to participants.'},
+  {code:'ME-03',pillar:'ME',q:'Q29',name:'Employees volunteering',kind:'num',target:5,unit:'employees',desc:'Employees participating (mentoring, jury, sessions, CV reviews). Per-sub target set by CCO (SETK 10, Morocco 2, Iran N/A...). Log hours and stage.'},
+  {code:'ME-04',pillar:'ME',q:'Q30',name:'Teacher orientation / education',kind:'bool',target:1,unit:'yes/no',desc:'Program introduction and ethics/behavior education provided to teachers and facilitators.'},
+  {code:'ME-05',pillar:'ME',q:'Q31',name:'Stakeholder feedback incorporated',kind:'bool',target:1,unit:'yes/no',desc:'Feedback incorporated into the program with documented positive outcomes (feedback > change > result).'},
+  {code:'ME-06',pillar:'ME',q:'Q32',name:'External awards won',kind:'num',target:1,unit:'awards',desc:'Awards recognizing the program\u2019s achievements won this year. Keep applying — past-year wins also score partially.'},
+  {code:'ME-07',pillar:'ME',q:'Q33',name:'External event presentations',kind:'num',target:1,unit:'events',desc:'Invited and participated at external events to present the program\u2019s achievements.'},
+];
+const SUBS = ['SGE','SETK SFT','SETK SIC','SELV','SESAR','SEPAK','SEIL','Iran','Morocco','Algeria','Tunisia','SEEG'];
+const DEFAULT_CYCLES = ['2025','2026'];
+const TIERS = [{tier:'A',min:85},{tier:'B',min:70},{tier:'C',min:50},{tier:'D',min:0}];
+
+/* ----------------- sample data (until data.csv is connected) --------------
+   2025 values below are the REAL figures from the CCO 28.07 deck (PRLs, press
+   coverage, SNS posts, employees volunteering, awards, government agreements,
+   alumni). SEEG 2025 is seeded in full from its SSIM template answers.
+   2026 rows carry the CCO-recommended per-sub targets, values still blank. */
+const SAMPLE_ROWS = [];
+(function seed(){
+  const S=(sub,cy,kpi,value,target,comment)=>SAMPLE_ROWS.push({subsidiary:sub,cycle:cy,kpi,
+    value:(value===null||value===undefined)?null:value,
+    target:(target===null||target===undefined)?'':target,comment:comment||'',updated:''});
+  const prl25={'SGE':3,'SETK SFT':8,'SETK SIC':8,'SELV':2,'SESAR':3,'SEPAK':2,'SEIL':0,'Iran':2,'Morocco':1,'Algeria':2,'Tunisia':3,'SEEG':5};
+  const press25={'SGE':86,'SETK SFT':1379,'SETK SIC':942,'SELV':56,'SESAR':91,'SEPAK':8,'Iran':16,'Morocco':86,'Algeria':70,'Tunisia':81};
+  const sns25={'SETK SFT':50,'SETK SIC':10,'SELV':0,'SESAR':4,'SEPAK':1,'Algeria':9,'Tunisia':4};
+  const ev25={'SGE':6,'SETK SFT':10,'SETK SIC':5,'SELV':0,'SESAR':0,'SEPAK':1,'Iran':0,'Morocco':2,'Algeria':2,'Tunisia':0,'SEEG':5};
+  const awards25={'SESAR':1,'Algeria':1,'SEEG':2};
+  const gov25={'SGE':1,'SETK SFT':1,'SETK SIC':1,'SELV':0,'SESAR':1,'SEPAK':0,'Iran':0,'Morocco':1,'Algeria':0,'Tunisia':0,'SEEG':1};
+  const alumni25={'SETK SFT':2,'SETK SIC':2,'SEPAK':2,'Algeria':2,'SEEG':3};
+  for(const s of SUBS){
+    if(prl25[s]!==undefined)S(s,'2025','ST-14',prl25[s]);
+    if(press25[s]!==undefined)S(s,'2025','ST-06',press25[s]);
+    if(sns25[s]!==undefined)S(s,'2025','ST-03',sns25[s]);
+    if(ev25[s]!==undefined)S(s,'2025','ME-03',ev25[s]);
+    S(s,'2025','ME-06',awards25[s]||0);
+    if(gov25[s]!==undefined)S(s,'2025','SU-01',gov25[s]);
+    S(s,'2025','SU-06',alumni25[s]||0);
+  }
+  // SEEG 2025 — full seed from its SSIM template answers
+  const g=(k,v,c)=>S('SEEG','2025',k,v,'',c);
+  g('ST-01',1,'WhatsApp communities and batch groups');g('ST-02',1,'Structured follow-up and alumni engagement');
+  g('ST-11',1,'Content plan prepared before launch');g('ST-12',1,'Improved awareness, applications and engagement vs 2024');
+  g('ST-13',4,'Students, teachers, government, employees collected');
+  g('SU-02',1,'LifeMakers and AI Africa Summit');g('SU-03',3,'Government, NGO and education representatives at events');
+  g('SU-04',1);g('SU-05',1,'Ethics applied at all program stages');g('SU-07',1,'Improved communication structure');
+  g('IM-01',1);g('IM-02',1,'Satisfaction up vs previous year');g('IM-03',3,'Capability, completion and employment tracked');
+  g('IM-04',100,'100+ hours of structured training');g('IM-05',1,'Hackathon held');g('IM-06',1);g('IM-07',1);g('IM-08',1);
+  g('ME-01',1,'Designed on real needs assessments');g('ME-02',2,'Jury members and senior representation');
+  g('ME-04',1,'Teacher and facilitator orientation');g('ME-05',1,'Shifted to larger venues based on feedback');g('ME-07',1,'Africa AI Summit 2025');
+  // 2026 — CCO-recommended per-sub targets (values to be filled by subs)
+  const prl26={'SGE':5,'SETK SFT':9,'SETK SIC':9,'SELV':5,'SESAR':5,'SEPAK':5,'SEIL':5,'Iran':5,'Morocco':5,'Algeria':5,'Tunisia':5,'SEEG':8};
+  const ev26={'SGE':10,'SETK SFT':10,'SETK SIC':10,'SELV':5,'SESAR':5,'SEPAK':5,'SEIL':5,'Iran':0,'Morocco':2,'Algeria':4,'Tunisia':2,'SEEG':5};
+  for(const s of SUBS){
+    S(s,'2026','ST-14',null,prl26[s],'CCO 2026 target');
+    S(s,'2026','ME-03',null,ev26[s],ev26[s]===0?'Not possible in Iran — partner employees volunteer instead':'CCO 2026 target');
+  }
+})();
+
+/* ------------------------------ data layer ------------------------------- */
+let ROWS=[]; let SOURCE='sample'; let LOADED_AT=null;
+
+function parseCSV(text){
+  const rows=[];let row=[],field='',inQ=false;
+  for(let i=0;i<text.length;i++){
+    const ch=text[i];
+    if(inQ){ if(ch==='"'){ if(text[i+1]==='"'){field+='"';i++;} else inQ=false; } else field+=ch; }
+    else{
+      if(ch==='"')inQ=true;
+      else if(ch===','){row.push(field);field='';}
+      else if(ch==='\n'||ch==='\r'){ if(ch==='\r'&&text[i+1]==='\n')i++; row.push(field);field=''; if(row.some(c=>c!=='')) rows.push(row); row=[]; }
+      else field+=ch;
+    }
+  }
+  if(field!==''||row.length){row.push(field); if(row.some(c=>c!=='')) rows.push(row);}
+  return rows;
+}
+function rowsFromCSV(text){
+  const raw=parseCSV(text); if(raw.length<2)return [];
+  const head=raw[0].map(h=>h.trim().toLowerCase());
+  const idx=n=>head.indexOf(n);
+  const iSub=idx('subsidiary'),iCy=idx('cycle'),iK=idx('kpi'),iV=idx('value'),iT=idx('target'),iC=idx('comment'),iU=idx('updated');
+  if(iSub<0||iK<0||iV<0)return [];
+  return raw.slice(1).map(r=>{
+    const vRaw=(r[iV]||'').trim(), tRaw=iT>=0?(r[iT]||'').trim():'';
+    return {subsidiary:(r[iSub]||'').trim(), cycle:(iCy>=0?(r[iCy]||'').trim():'')||'2026',
+      kpi:(r[iK]||'').trim().toUpperCase(),
+      value:vRaw===''?null:parseFloat(vRaw),
+      target:tRaw===''?'':parseFloat(tRaw),
+      comment:iC>=0?(r[iC]||'').trim():'', updated:iU>=0?(r[iU]||'').trim():''};
+  }).filter(r=>r.subsidiary&&r.kpi&&(r.value!==null&&!isNaN(r.value) || r.target!==''&&!isNaN(r.target)))
+    .map(r=>({...r,value:(r.value!==null&&!isNaN(r.value))?r.value:null}));
+}
+async function loadData(){
+  if(CONFIG.DATA_URL){
+    try{
+      const resp=await fetch(CONFIG.DATA_URL,{cache:'no-store'});
+      if(resp.ok){
+        const rows=rowsFromCSV(await resp.text());
+        if(rows.length){ROWS=rows;SOURCE='sheet';LOADED_AT=new Date();return;}
+      }
+    }catch(e){/* fall back to sample */}
+  }
+  ROWS=SAMPLE_ROWS;SOURCE='sample';LOADED_AT=new Date();
+}
+function allCycles(){
+  const set=new Set(DEFAULT_CYCLES); ROWS.forEach(r=>set.add(r.cycle));
+  return [...set].sort();
+}
+
+/* ------------------------------ scoring ---------------------------------- */
+function subsForCycle(cycle){
+  const inData=[...new Set(ROWS.filter(r=>r.cycle===cycle).map(r=>r.subsidiary))];
+  return SUBS.filter(s=>inData.includes(s)).concat(inData.filter(s=>!SUBS.includes(s)));
+}
+function getEntry(sub,cycle,code){
+  let found=null;
+  for(const r of ROWS) if(r.subsidiary===sub&&r.cycle===cycle&&r.kpi===code) found=r;
+  return found;
+}
+function kpiStatus(k,entry){
+  const target=(entry&&entry.target!==''&&!isNaN(entry.target))?entry.target:k.target;
+  if(target<=0) return {pct:0,value:entry?entry.value:null,target,status:'na',comment:entry&&entry.comment,updated:entry&&entry.updated};
+  if(!entry||entry.value===null) return {pct:0,value:null,target,status:'not_started',comment:entry&&entry.comment,updated:entry&&entry.updated};
+  const pct=Math.min(100,Math.round(entry.value/target*100));
+  let status;
+  if(k.kind==='bool') status=entry.value>=target?'completed':'missing';
+  else if(pct>=100)status='completed'; else if(pct>=75)status='on_track';
+  else if(pct>=50)status='attention'; else status='at_risk';
+  return {pct,value:entry.value,target,status,comment:entry.comment,updated:entry.updated};
+}
+function subScore(sub,cycle){
+  // a sub appears in a cycle as soon as ANY row exists for it (even a
+  // target-only row), so a fresh year starts with every sub visible at 0%
+  let hasRow=ROWS.some(r=>r.subsidiary===sub&&r.cycle===cycle);
+  const pillarPct={};const details=[];
+  for(const p of PILLARS){
+    const ks=KPIS.filter(k=>k.pillar===p.id);
+    let n=0,acc=0;
+    for(const k of ks){
+      const st=kpiStatus(k,getEntry(sub,cycle,k.code));
+      if(st.status!=='na'){n++;acc+=st.pct;}
+      details.push({kpi:k,st});
+    }
+    pillarPct[p.id]=n?Math.round(acc/n):0;
+  }
+  if(!hasRow)return null;
+  const total=Math.round(PILLARS.reduce((a,p)=>a+pillarPct[p.id]*p.weight,0)/100*10)/10;
+  const pillars=PILLARS.map(p=>({pillar:p,pct:pillarPct[p.id]}));
+  const tier=TIERS.find(t=>total>=t.min).tier;
+  return {sub,total,tier,pillars,details};
+}
+const STATUS_META={
+  completed:{label:'Target met',cls:'ok'}, on_track:{label:'On track',cls:'ok'},
+  attention:{label:'Needs attention',cls:'warn'}, at_risk:{label:'At risk',cls:'risk'},
+  missing:{label:'Missing',cls:'risk'}, not_started:{label:'No data',cls:'idle'},
+  na:{label:'Not applicable',cls:'idle'},
+};
+function pctClass(p){return p>=75?'c-ok':p>=50?'c-warn':p>0?'c-risk':'c-idle';}
+function fillClass(s){return (s==='completed'||s==='on_track')?'f-ok':s==='attention'?'f-warn':(s==='at_risk'||s==='missing')?'f-risk':'f-idle';}
+function esc(s){return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+
+/* ------------------------------ rendering -------------------------------- */
+let state={page:'overview',sub:null,cycle:'2026'};
+let charts=[];
+function killCharts(){charts.forEach(c=>c.destroy());charts=[];}
+
+function render(){
+  killCharts();
+  const app=document.getElementById('app');
+  app.innerHTML=`
+  <header class="appbar"><div class="appbar-inner">
+    <div class="wordmark">SSIM KPI Dashboard <span>${esc(CONFIG.TITLE)}</span></div>
+    <nav class="tabs" aria-label="Pages">
+      <button class="tab ${state.page==='overview'?'active':''}" onclick="go('overview')">Overview</button>
+      <button class="tab ${state.page==='subs'||state.page==='detail'?'active':''}" onclick="go('subs')">Subsidiaries</button>
+      <button class="tab ${state.page==='guide'?'active':''}" onclick="go('guide')">KPI guide</button>
+    </nav>
+    <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#B9C2E8">Year
+      <select class="cycle-sel" onchange="state.cycle=this.value;render()">
+        ${allCycles().map(c=>`<option ${c===state.cycle?'selected':''}>${esc(c)}</option>`).join('')}
+      </select></label>
+  </div></header>
+  <main class="wrap" id="main"></main>`;
+  const m=document.getElementById('main');
+  if(state.page==='overview')renderOverview(m);
+  else if(state.page==='subs')renderSubs(m);
+  else if(state.page==='detail')renderDetail(m,state.sub);
+  else renderGuide(m);
+}
+function go(p){state.page=p;render();window.scrollTo(0,0);}
+function openSub(s){state.page='detail';state.sub=s;render();window.scrollTo(0,0);}
+
+function sourceLine(){
+  const when=LOADED_AT?LOADED_AT.toLocaleString():'';
+  return SOURCE==='sheet'
+    ? `<div class="datasource"><span class="dot live"></span>Live data from data.csv · loaded ${when} · refresh the page to pull the latest commits</div>`
+    : `<div class="datasource"><span class="dot sample"></span>Showing built-in data (2025 actuals from the CCO deck) — add a data.csv next to this file to go live</div>`;
+}
+
+/* ---- overview ---- */
+function renderOverview(m){
+  const subs=subsForCycle(state.cycle);
+  const scores=subs.map(s=>subScore(s,state.cycle)).filter(Boolean).sort((a,b)=>b.total-a.total);
+  const avg=scores.length?Math.round(scores.reduce((a,s)=>a+s.total,0)/scores.length):0;
+  const onTrack=scores.filter(s=>s.total>=75).length;
+  const atRisk=scores.filter(s=>s.total<50).length;
+  const noData=scores.reduce((a,s)=>a+s.details.filter(d=>d.st.status==='not_started').length,0);
+
+  m.innerHTML=`
+  <div class="page-head">
+    <h1>SSIM ${esc(state.cycle)} — region at a glance</h1>
+    <p>Progress against the SSIM survey requirements: Storytelling 60% · Sustainable 20% · Impactful 10% · Meaningful 10%. Click a subsidiary for its full target-gap breakdown.</p>
+    ${sourceLine()}
+  </div>
+  <div class="statline">
+    <div class="stat"><div class="v">${avg}%</div><div class="l">Average SSIM readiness</div></div>
+    <div class="stat"><div class="v">${scores.length}</div><div class="l">Subsidiaries tracked</div></div>
+    <div class="stat"><div class="v">${onTrack}</div><div class="l">On track (≥75%)</div></div>
+    <div class="stat"><div class="v">${atRisk}</div><div class="l">At risk (&lt;50%)</div></div>
+    <div class="stat"><div class="v">${noData}</div><div class="l">KPIs missing data</div></div>
+  </div>
+  ${scores.length?`
+  <div class="panel">
+    <h2>SSIM readiness by subsidiary</h2>
+    <div class="sub">Pillar-weighted completion of all ${KPIS.length} SSIM requirements. A full bar means every requirement met — a projected top rating.</div>
+    <div class="chartbox" style="height:${Math.max(180,scores.length*38+40)}px"><canvas id="cmpChart"></canvas></div>
+  </div>
+  <div class="panel">
+    <h2>Pillar heatmap</h2>
+    <div class="sub">Completion per SSIM pillar — where each subsidiary is losing points. Storytelling carries 60% of the score.</div>
+    <div style="overflow-x:auto"><table class="heat">
+      <thead><tr><th>Subsidiary</th><th style="width:60px">Tier</th>
+        ${PILLARS.map(p=>`<th class="num">${esc(p.name)} <span style="font-weight:400">${p.weight}%</span></th>`).join('')}
+        <th class="num">Overall</th></tr></thead>
+      <tbody>${scores.map(s=>`<tr>
+        <td><button class="rowlink" onclick="openSub('${esc(s.sub)}')">${esc(s.sub)}</button></td>
+        <td><span class="tierchip t-${s.tier}">${s.tier}</span></td>
+        ${s.pillars.map(p=>`<td class="num"><span class="cellpct ${pctClass(p.pct)}">${p.pct}%</span></td>`).join('')}
+        <td class="num"><span class="cellpct ${pctClass(s.total)}">${s.total}%</span></td>
+      </tr>`).join('')}</tbody>
+    </table></div>
+  </div>`:`<div class="panel"><div class="empty">No data yet for ${esc(state.cycle)}. As soon as subsidiaries fill data.csv with ${esc(state.cycle)} rows, their progress appears here — previous years remain untouched.</div></div>`}`;
+
+  if(scores.length){
+    charts.push(new Chart(document.getElementById('cmpChart'),{type:'bar',data:{
+      labels:scores.map(s=>s.sub),
+      datasets:[{data:scores.map(s=>s.total),
+        backgroundColor:scores.map(s=>s.total>=75?'#1428A0':s.total>=50?'#B96E00':'#C8362B'),
+        borderRadius:4,barThickness:18}]},
+      options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.raw}% of SSIM requirements met`}}},
+        scales:{x:{min:0,max:100,ticks:{callback:v=>v+'%'},grid:{color:'#EDEFF4'}},
+                y:{grid:{display:false},ticks:{font:{family:'Schibsted Grotesk',size:13,weight:600}}}}}}));
+  }
+}
+
+/* ---- subsidiaries list ---- */
+function renderSubs(m){
+  const subs=subsForCycle(state.cycle);
+  const scores=subs.map(s=>subScore(s,state.cycle)).filter(Boolean).sort((a,b)=>b.total-a.total);
+  m.innerHTML=`
+  <div class="page-head"><h1>Subsidiaries — ${esc(state.cycle)}</h1>
+    <p>Ranked by SSIM readiness. Open a subsidiary to see every requirement against its target, plus the year-on-year view.</p>
+    ${sourceLine()}</div>
+  <div class="panel"><div style="overflow-x:auto"><table class="heat">
+    <thead><tr><th style="width:36px">#</th><th>Subsidiary</th><th style="width:60px">Tier</th>
+      <th class="num">Overall</th><th>Weakest pillar</th><th class="num">Targets met</th><th class="num">At risk / missing</th></tr></thead>
+    <tbody>${scores.map((s,i)=>{
+      const weak=[...s.pillars].sort((a,b)=>a.pct-b.pct)[0];
+      const met=s.details.filter(d=>d.st.status==='completed').length;
+      const applicable=s.details.filter(d=>d.st.status!=='na').length;
+      const risk=s.details.filter(d=>['at_risk','missing','not_started'].includes(d.st.status)).length;
+      return `<tr>
+        <td style="color:var(--mut)">${i+1}</td>
+        <td><button class="rowlink" onclick="openSub('${esc(s.sub)}')">${esc(s.sub)}</button></td>
+        <td><span class="tierchip t-${s.tier}">${s.tier}</span></td>
+        <td class="num"><span class="cellpct ${pctClass(s.total)}">${s.total}%</span></td>
+        <td>${esc(weak.pillar.name)} <span style="color:var(--mut)">(${weak.pct}%)</span></td>
+        <td class="num">${met} / ${applicable}</td>
+        <td class="num">${risk?`<span class="cellpct c-risk">${risk}</span>`:'—'}</td>
+      </tr>`;}).join('')}</tbody></table></div>
+    ${scores.length?'':`<div class="empty">No data yet for ${esc(state.cycle)}.</div>`}</div>`;
+}
+
+/* ---- subsidiary detail ---- */
+function renderDetail(m,sub){
+  const s=subScore(sub,state.cycle);
+  const cyclesWithData=allCycles().filter(c=>ROWS.some(r=>r.subsidiary===sub&&r.cycle===c&&r.value!==null));
+  const yoy=cyclesWithData.length>=2||cyclesWithData.length===1&&cyclesWithData[0]!==state.cycle;
+
+  if(!s){m.innerHTML=`<button class="backlink" onclick="go('subs')">&larr; All subsidiaries</button>
+    <div class="page-head"><h1>${esc(sub)} — ${esc(state.cycle)}</h1>${sourceLine()}</div>
+    <div class="panel"><div class="empty">No ${esc(state.cycle)} data yet for ${esc(sub)}.${cyclesWithData.length?` Data exists for ${cyclesWithData.join(', ')} — switch the year selector above.`:''}</div></div>`;return;}
+  const next=TIERS.filter(t=>t.min>s.total).pop();
+  const gap=next?`<div class="gaphint">${(next.min-s.total).toFixed(1)} points to Tier ${next.tier} — the bars below show exactly where to gain them. Storytelling items move the score 6× more than Impactful or Meaningful items.</div>`:`<div class="gaphint">Tier A — on course for a top SSIM rating.</div>`;
+
+  m.innerHTML=`
+  <button class="backlink" onclick="go('subs')">&larr; All subsidiaries</button>
+  <div class="page-head"><h1>${esc(sub)} — SSIM ${esc(state.cycle)}</h1>${sourceLine()}</div>
+  <div class="sumband">
+    <div>
+      <div class="bigscore">${s.total}<small>%</small> <span class="tierchip t-${s.tier}" style="vertical-align:14px">${s.tier}</span></div>
+      <div class="scoremeta">Pillar-weighted completion of ${s.details.filter(d=>d.st.status!=='na').length} applicable SSIM requirements ·
+        ${s.details.filter(d=>d.st.status==='completed').length} met ·
+        ${s.details.filter(d=>['at_risk','missing','not_started'].includes(d.st.status)).length} at risk or missing</div>
+      ${gap}
+    </div>
+    <div class="radarbox"><canvas id="radar"></canvas></div>
+  </div>
+  ${cyclesWithData.length>1?`
+  <div class="panel">
+    <h2>Year on year — % of target achieved</h2>
+    <div class="sub">Each numeric KPI as a share of that year's target, so different units compare fairly. Targets can differ per year (e.g. PRL target raised by CCO for ${esc(state.cycle)}).</div>
+    <div class="chartbox" style="height:300px"><canvas id="yoy"></canvas></div>
+  </div>`:''}
+  ${PILLARS.map(p=>{
+    const rows=s.details.filter(d=>d.kpi.pillar===p.id);
+    const ppct=s.pillars.find(x=>x.pillar.id===p.id).pct;
+    return `<section class="pillarsec">
+      <h2>${esc(p.name)} <span class="pw">${ppct}% of pillar requirements · ${p.weight}% of SSIM score</span></h2>
+      <div class="pdesc">${esc(p.desc)}</div>
+      <div class="kpilist">${rows.map(d=>{
+        const sm=STATUS_META[d.st.status];
+        const isNa=d.st.status==='na';
+        const valTxt=d.st.value===null?'—':(d.kpi.kind==='bool'?(d.st.value>=d.st.target?'Yes':'No'):d.st.value);
+        const tgtTxt=isNa?'Not applicable this year':(d.kpi.kind==='bool'?'Required (yes/no)':`Target ${d.st.target} ${esc(d.kpi.unit)}`);
+        return `<div class="kpirow">
+          <div><div class="kpiname">${esc(d.kpi.name)}<span class="kpiq">SSIM ${esc(d.kpi.q)}</span></div>
+            <div class="kpitarget">${tgtTxt}</div>
+            ${d.st.comment?`<div class="kpicomment">“${esc(d.st.comment)}”${d.st.updated?` · ${esc(d.st.updated)}`:''}</div>`:''}</div>
+          <div class="bullet" role="img" aria-label="${esc(d.kpi.name)}: ${isNa?'not applicable':d.st.pct+'% of target'}">
+            ${isNa?'':`<div class="fill ${fillClass(d.st.status)}" style="width:${d.st.pct}%"></div><div class="tick"></div><div class="ticklbl">target</div>`}
+          </div>
+          <div class="kpistat">${isNa?`<span class="statuschip c-idle">N/A</span>`:`<div class="pct">${d.st.pct}%</div>
+            <div class="vt">${valTxt}${d.kpi.kind==='bool'?'':' / '+d.st.target}</div>
+            <span class="statuschip c-${sm.cls}">${sm.label}</span>`}</div>
+        </div>`;}).join('')}</div>
+    </section>`;}).join('')}`;
+
+  charts.push(new Chart(document.getElementById('radar'),{type:'radar',data:{
+    labels:s.pillars.map(p=>`${p.pillar.name} ${p.pillar.weight}%`),
+    datasets:[{label:'% of pillar requirements',data:s.pillars.map(p=>p.pct),
+      backgroundColor:'rgba(20,40,160,.15)',borderColor:'#1428A0',borderWidth:2,
+      pointBackgroundColor:'#1428A0',pointRadius:3}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.raw}% of requirements`}}},
+      scales:{r:{min:0,max:100,ticks:{stepSize:25,backdropColor:'transparent',color:'#9AA0AC',font:{size:10}},
+        grid:{color:'#E4E6EC'},angleLines:{color:'#E4E6EC'},
+        pointLabels:{font:{family:'Schibsted Grotesk',size:11,weight:600},color:'#1A1C23'}}}}}));
+
+  if(cyclesWithData.length>1){
+    const numKpis=KPIS.filter(k=>k.kind==='num'&&cyclesWithData.some(c=>{const e=getEntry(sub,c,k.code);return e&&e.value!==null;}));
+    const palette=['#9AA0AC','#1428A0','#0E8A5F','#B96E00','#7C3AED'];
+    const datasets=cyclesWithData.map((c,i)=>({label:c,
+      data:[ (subScore(sub,c)?.total)??0, ...numKpis.map(k=>kpiStatus(k,getEntry(sub,c,k.code)).pct) ],
+      backgroundColor:palette[i%palette.length],borderRadius:3,maxBarThickness:26}));
+    charts.push(new Chart(document.getElementById('yoy'),{type:'bar',data:{
+      labels:['Overall',...numKpis.map(k=>k.name.length>22?k.code:k.name)],datasets},
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{position:'top',labels:{font:{family:'Schibsted Grotesk',size:12,weight:600},boxWidth:14}},
+          tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${c.raw}% of that year's target`}}},
+        scales:{y:{min:0,max:100,ticks:{callback:v=>v+'%'},grid:{color:'#EDEFF4'}},
+                x:{grid:{display:false},ticks:{font:{family:'Schibsted Grotesk',size:11},maxRotation:45,minRotation:0}}}}}));
+  }
+}
+
+/* ---- KPI guide ---- */
+function renderGuide(m){
+  m.innerHTML=`
+  <div class="page-head"><h1>SSIM KPI guide</h1>
+    <p>The SSIM survey requirements translated into trackable KPIs, grouped by pillar with the SSIM question reference.
+    A subsidiary-specific target for a given year is set in data.csv's <code class="k">target</code> column
+    (e.g. PRL target 9 for SETK, 8 for SEEG, 5 elsewhere). A target of 0 marks a KPI not applicable for that subsidiary.</p>
+    ${sourceLine()}</div>
+  ${PILLARS.map(p=>`<div class="panel">
+    <h2>${esc(p.name)} <span style="font-weight:500;color:var(--mut);font-size:13px">· ${p.weight}% of the SSIM score</span></h2>
+    <div class="sub">${esc(p.desc)}</div>
+    <table class="guide"><thead><tr><th style="width:80px">Code</th><th style="width:70px">SSIM</th><th style="width:220px">KPI</th><th>Full-score requirement & evidence</th><th style="width:120px">Default target</th></tr></thead>
+    <tbody>${KPIS.filter(k=>k.pillar===p.id).map(k=>`<tr>
+      <td><code class="k">${k.code}</code></td><td style="color:var(--mut)">${esc(k.q)}</td>
+      <td style="font-weight:600">${esc(k.name)}</td>
+      <td style="color:var(--mut)">${esc(k.desc)}</td>
+      <td>${k.kind==='bool'?'Yes (1)':`${k.target} ${esc(k.unit)}`}</td></tr>`).join('')}
+    </tbody></table></div>`).join('')}
+  <div class="note"><strong>How updates work:</strong> subsidiaries edit <code class="k">data.csv</code> in the GitHub repository
+  (open the file &gt; pencil icon &gt; change your rows &gt; Commit changes). The dashboard re-reads the file on every page load.
+  <strong>New year:</strong> add rows with the new year in the cycle column — it appears in the year selector automatically and
+  all previous years stay available. If a KPI appears twice for the same subsidiary and year, the last row wins, so corrections
+  can simply be appended at the bottom of the file.</div>`;
+}
+
+/* ------------------------------ boot ------------------------------------- */
+(async function(){
+  await loadData();
+  const withData=allCycles().filter(c=>ROWS.some(r=>r.cycle===c&&r.value!==null));
+  if(withData.length && !withData.includes(state.cycle)) state.cycle=withData[withData.length-1];
+  render();
+})();
+window.go=go; window.openSub=openSub;
+</script>
+</body>
+</html>
